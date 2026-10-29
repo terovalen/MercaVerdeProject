@@ -1,0 +1,8 @@
+node_modules
+.env
+api/.env
+api/api.env
+*firebase-adminsdk*.json
+*service-account*.json
+api/service.account.json
+.expo/

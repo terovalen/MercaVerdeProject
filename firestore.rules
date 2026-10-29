@@ -1,0 +1,28 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+    function signedIn() { return request.auth != null; }
+
+    match /Productos/{productId} {
+      allow read: if signedIn();
+      // Inventory mutations go through the authenticated API (Admin SDK).
+      allow write: if false;
+    }
+
+    match /usuarios/{userId} {
+      allow read: if signedIn() && request.auth.uid == userId;
+      allow create: if signedIn()
+        && request.auth.uid == userId
+        && request.resource.data.rol == 'comprador'
+        && request.resource.data.correo == request.auth.token.email
+        && request.resource.data.keys().hasOnly(['nombre', 'correo', 'rol', 'genero', 'creadoEn']);
+      // Role changes must happen from a trusted Firebase Admin environment.
+      allow update, delete: if false;
+    }
+
+    match /pedidos/{pedidoId} {
+      // Orders are read and changed through the API.
+      allow read, write: if false;
+    }
+  }
+}
