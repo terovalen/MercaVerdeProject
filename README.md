@@ -150,7 +150,7 @@ Estados de un pedido: `recibido` → `en_preparacion` → `listo` → `entregado
 
 2. **Verificar variables de entorno** (ya están creadas):
 
-   - `.env` (raíz): `EXPO_PUBLIC_API_URL=http://192.168.10.14:3001` — la IP local de la PC. Cámbiala si tu red asigna otra dirección (`ipconfig` → *Dirección IPv4*).
+   - `.env` (raíz): `EXPO_PUBLIC_API_URL` es opcional para Expo Go: la app detecta automáticamente la IP del computador que sirve el QR y usa el puerto `3001`. Defínela solo si usas una API desplegada o un puerto diferente.
    - `api/.env`: `PORT=3001`, `FIREBASE_PROJECT_ID`, `CORS_ORIGIN=*` y `GOOGLE_APPLICATION_CREDENTIALS=./service.account.json`.
 
 3. **Iniciar la API** (terminal 1):
@@ -160,7 +160,7 @@ Estados de un pedido: `recibido` → `en_preparacion` → `listo` → `entregado
    npm start
    ```
 
-   Verificación: abre `http://localhost:3001/health` → debe responder `{"ok":true}`. Desde el celular: `http://192.168.10.14:3001/health`.
+   Verificación: abre `http://localhost:3001/health` → debe responder `{"ok":true}`. El PC y el celular deben estar en la misma red Wi-Fi.
 
 4. **Iniciar la app** (terminal 2, desde la raíz):
 

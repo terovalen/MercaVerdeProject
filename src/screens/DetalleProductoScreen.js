@@ -10,7 +10,7 @@ import {
   Alert,
   ScrollView,
 } from "react-native";
-import { obtenerProducto } from "../services/catalogoService";
+import { fuenteImagenProducto, obtenerProducto } from "../services/catalogoService";
 import { leerCatalogoLocal } from "../data/repositorioLocal";
 import { alternarSeguimiento, obtenerSeguidos } from "../casosdeuso/seguimientoStock";
 import { useCart } from "../context/CartContext";
@@ -132,8 +132,8 @@ export default function DetalleProductoScreen({ route, navigation }) {
 
   return (
     <ScrollView style={styles.contenedor} contentContainerStyle={styles.contenido}>
-      {producto.imagenUrl ? (
-        <Image source={{ uri: producto.imagenUrl }} style={styles.imagen} />
+      {fuenteImagenProducto(producto.imagenUrl) ? (
+        <Image source={fuenteImagenProducto(producto.imagenUrl)} style={styles.imagen} />
       ) : (
         <View style={[styles.imagen, styles.imagenPlaceholder]}>
           <Text style={{ color: "#9AA79A" }}>Sin imagen</Text>

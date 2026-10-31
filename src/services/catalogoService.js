@@ -22,9 +22,29 @@
 
 import { conTiempoLimite } from "../utils/conTiempoLimite";
 import { apiRequest } from "./apiClient";
+import { collection, getDocs } from "firebase/firestore";
+import { db } from "./firebaseConfig";
 
 /** Nombre real de la colección en el proyecto de Firebase ya cargado. */
 const COLECCION_PRODUCTOS = "Productos";
+const IMAGENES_LOCALES = {
+  "Imagen1.jpg": require("../../imagenes/Imagen1.jpg"),
+  "imagen2.jpg": require("../../imagenes/imagen2.jpg"),
+  "imagen4.jpg": require("../../imagenes/imagen4.jpg"),
+  "imagen6.jpg": require("../../imagenes/imagen6.jpg"),
+};
+
+/**
+ * React Native necesita un recurso estático para las imágenes incluidas
+ * en la aplicación; una cadena con "Imagen1.jpg" no es una URI válida.
+ */
+export function fuenteImagenProducto(imagenUrl) {
+  if (!imagenUrl || typeof imagenUrl !== "string") return null;
+  if (/^https?:\/\//i.test(imagenUrl)) return { uri: imagenUrl };
+
+  const nombre = imagenUrl.split(/[\\/]/).pop();
+  return IMAGENES_LOCALES[nombre] || null;
+}
 
 /**
  * Lee el primer campo que exista. En Firestore hay documentos con
@@ -66,8 +86,24 @@ export function normalizarProducto(id, data = {}) {
  * Ese filtro solo devolvía el pastel de queso, el único con el campo en minúscula.
  */
 export async function obtenerCatalogo() {
-  const productos = await conTiempoLimite(apiRequest("/api/catalogo"));
-  return productos.map(({ id, ...data }) => normalizarProducto(id, data));
+  try {
+    const productos = await conTiempoLimite(apiRequest("/api/catalogo"));
+    return productos.map(({ id, ...data }) => normalizarProducto(id, data));
+  } catch (errorApi) {
+    try {
+      const snapshot = await conTiempoLimite(getDocs(collection(db, COLECCION_PRODUCTOS)));
+      return snapshot.docs.map((documento) => {
+        const data = { ...documento.data() };
+        delete data.disponibilidad;
+        delete data.Disponibilidad;
+        delete data["Disponibilidad "];
+        delete data["disponibilidad "];
+        return normalizarProducto(documento.id, data);
+      });
+    } catch {
+      throw errorApi;
+    }
+  }
 }
 
 

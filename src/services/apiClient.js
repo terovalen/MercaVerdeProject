@@ -1,8 +1,20 @@
 import { auth } from "./firebaseConfig";
+import Constants from "expo-constants";
 
-// Set EXPO_PUBLIC_API_URL to the deployed API origin. Local devices need the
-// computer's LAN address, not localhost.
-const BASE_URL = process.env.EXPO_PUBLIC_API_URL || "http://localhost:3001";
+function obtenerUrlApiLocal() {
+  const hostUri =
+    Constants.expoConfig?.hostUri ||
+    Constants.manifest2?.extra?.expoClient?.hostUri ||
+    Constants.manifest?.debuggerHost;
+  const host = hostUri?.split(":")[0];
+  return host ? `http://${host}:3001` : "http://localhost:3001";
+}
+
+// EXPO_PUBLIC_API_URL tiene prioridad para una API desplegada. En Expo Go,
+// hostUri permite usar automáticamente la IP del computador que sirve el QR.
+const BASE_URL = (
+  process.env.EXPO_PUBLIC_API_URL || obtenerUrlApiLocal()
+).replace(/\/+$/, "");
 
 export async function apiRequest(path, { method = "GET", body } = {}) {
   const token = await auth.currentUser?.getIdToken();

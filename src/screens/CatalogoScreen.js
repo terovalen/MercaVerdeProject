@@ -12,6 +12,7 @@ import {
 } from "react-native";
 import { useFocusEffect } from "@react-navigation/native";
 import { cargarCatalogoDelUsuario } from "../casosdeuso/cargarCatalogo";
+import { fuenteImagenProducto } from "../services/catalogoService";
 import { categoriasDe, filtrarProductos } from "../domain/filtrosCatalogo";
 import { useCart } from "../context/CartContext";
 import { useAuth } from "../context/AuthContext";
@@ -126,8 +127,8 @@ export default function CatalogoScreen({ navigation }) {
               navigation.navigate("DetalleProducto", { productoId: item.id, producto: item })
             }
           >
-            {item.imagenUrl ? (
-              <Image source={{ uri: item.imagenUrl }} style={styles.imagen} />
+            {fuenteImagenProducto(item.imagenUrl) ? (
+              <Image source={fuenteImagenProducto(item.imagenUrl)} style={styles.imagen} />
             ) : (
               <View style={[styles.imagen, styles.imagenPlaceholder]}>
                 <Text style={{ color: "#9AA79A" }}>Sin imagen</Text>
