@@ -6,7 +6,6 @@ import {
   FlatList,
   TouchableOpacity,
   StyleSheet,
-  Alert,
   ActivityIndicator,
 } from "react-native";
 import { useCart } from "../context/CartContext";
@@ -15,12 +14,14 @@ import { useConexion } from "../context/ConexionContext";
 import { useSync } from "../context/SyncContext";
 import { confirmarPedidoUsuario } from "../casosdeuso/confirmarPedido";
 import { formatearPrecio } from "../utils/formato";
+import usarDialogos from "../components/usarDialogos";
 
 export default function CarritoScreen({ navigation }) {
   const { items, total, actualizarCantidad, quitarProducto, vaciarCarrito } = useCart();
   const { usuario } = useAuth();
   const { enLinea } = useConexion();
   const { sincronizar, refrescar } = useSync();
+  const { caja: dialogos, avisar } = usarDialogos();
   const [confirmando, setConfirmando] = useState(false);
 
   /**
@@ -38,7 +39,7 @@ export default function CarritoScreen({ navigation }) {
       });
 
       if (!resultado.ok) {
-        Alert.alert("No se pudo confirmar el pedido", resultado.mensaje);
+        avisar("No se pudo confirmar el pedido", resultado.mensaje);
         return;
       }
 
@@ -48,13 +49,13 @@ export default function CarritoScreen({ navigation }) {
       }
       await refrescar();
 
-      Alert.alert(
+      avisar(
         resultado.pendiente ? "Pedido pendiente" : "Pedido confirmado",
         `${resultado.mensaje} Total ${formatearPrecio(resultado.pedido.total)}.`
       );
       navigation.navigate("MisPedidos");
     } catch (error) {
-      Alert.alert("No se pudo confirmar el pedido", error.message);
+      avisar("No se pudo confirmar el pedido", error.message);
     } finally {
       setConfirmando(false);
     }
@@ -117,6 +118,7 @@ export default function CarritoScreen({ navigation }) {
           </Text>
         )}
       </TouchableOpacity>
+      {dialogos}
     </View>
   );
 }

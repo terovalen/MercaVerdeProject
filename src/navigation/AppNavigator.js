@@ -75,10 +75,11 @@ function ZonaAutenticada({ usuario }) {
   const { salir } = useAuth();
 
   /**
-   * Navega solo si el contenedor ya está montado.
+   * Navega solo si el contenedor ya está montado. Para el panel operativo
+   * va acompañado de la sección que abre (inventario/tickets/analítica).
    */
-  function irA(pantalla) {
-    if (navegacionRef.isReady()) navegacionRef.navigate(pantalla);
+  function irA(pantalla, parametros) {
+    if (navegacionRef.isReady()) navegacionRef.navigate(pantalla, parametros);
   }
 
   return (
@@ -90,9 +91,12 @@ function ZonaAutenticada({ usuario }) {
           </View>
           <MenuPrincipal
             rol={usuario.rol || "comprador"}
-            onInicio={() => irA(usuario.rol === "comprador" ? "Catalogo" : "Operacion")}
-            onPedidos={() => irA(usuario.rol === "comprador" ? "MisPedidos" : "Operacion")}
-            onAlertas={() => irA(usuario.rol === "comprador" ? "AlertasStock" : "Operacion")}
+            onInicio={() => (usuario.rol === "comprador" ? irA("Catalogo") : irA("Operacion", { seccion: "inventario" }))}
+            onPedidos={() => (usuario.rol === "comprador" ? irA("MisPedidos") : irA("Operacion", { seccion: "tickets" }))}
+            onAlertas={() => (usuario.rol === "comprador" ? irA("AlertasStock") : irA("Operacion", { seccion: "analitica" }))}
+            onInventario={() => irA("Operacion", { seccion: "inventario" })}
+            onTickets={() => irA("Operacion", { seccion: "tickets" })}
+            onAnalitica={() => irA("Operacion", { seccion: "analitica" })}
             onSalir={salir}
           />
         </View>

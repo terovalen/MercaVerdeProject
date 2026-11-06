@@ -7,7 +7,6 @@ import {
   StyleSheet,
   ActivityIndicator,
   TouchableOpacity,
-  Alert,
   ScrollView,
 } from "react-native";
 import { obtenerProducto } from "../services/catalogoService";
@@ -17,6 +16,7 @@ import { useCart } from "../context/CartContext";
 import { useAuth } from "../context/AuthContext";
 import { useConexion } from "../context/ConexionContext";
 import { formatearPrecio } from "../utils/formato";
+import usarDialogos from "../components/usarDialogos";
 
 export default function DetalleProductoScreen({ route, navigation }) {
   const { productoId, producto: productoInicial } = route.params;
@@ -27,6 +27,7 @@ export default function DetalleProductoScreen({ route, navigation }) {
   const [cantidad, setCantidad] = useState(1);
   const [cargando, setCargando] = useState(!productoInicial);
   const [siguiendo, setSiguiendo] = useState(false);
+  const { caja: dialogos, avisar } = usarDialogos();
 
   useEffect(() => {
     let vivo = true;
@@ -84,18 +85,18 @@ export default function DetalleProductoScreen({ route, navigation }) {
     if (!producto) return;
     const mostrada = producto.disponibilidad == null ? null : Number(producto.disponibilidad);
     if (mostrada != null && mostrada <= 0) {
-      Alert.alert("Sin existencias", "Este producto está agotado por ahora.");
+      avisar("Sin existencias", "Este producto está agotado por ahora.");
       return;
     }
     if (mostrada != null && cantidad > mostrada) {
-      Alert.alert(
+      avisar(
         "Cantidad no disponible",
         `Solo quedan ${mostrada} ${producto.unidad}.`
       );
       return;
     }
     agregarProducto(producto, cantidad);
-    Alert.alert("Agregado", `${producto.nombre} se agregó al pedido.`);
+    avisar("Agregado", `${producto.nombre} se agregó al pedido.`);
     navigation.goBack();
   }
 
@@ -173,6 +174,7 @@ export default function DetalleProductoScreen({ route, navigation }) {
           {siguiendo ? "Dejar de seguir disponibilidad" : "Seguir disponibilidad"}
         </Text>
       </TouchableOpacity>
+      {dialogos}
     </ScrollView>
   );
 }

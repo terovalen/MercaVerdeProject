@@ -10,6 +10,7 @@ export const ESTADOS_PEDIDO = {
   LISTO: "listo",
   ENTREGADO: "entregado",
   CANCELADO: "cancelado",
+  CAMBIO_PENDIENTE: "cambio_pendiente",
 };
 
 /**
@@ -18,6 +19,7 @@ export const ESTADOS_PEDIDO = {
  */
 const META_ESTADO = {
   recibido: { etiqueta: "Recibido", color: "#1565C0", fondo: "#E3F2FD" },
+  cambio_pendiente: { etiqueta: "Cambio pendiente", color: "#8D5B00", fondo: "#FFF8E1" },
   en_preparacion: { etiqueta: "En preparación", color: "#EF6C00", fondo: "#FFF3E0" },
   listo: { etiqueta: "Listo", color: "#2E7D32", fondo: "#E8F5E9" },
   entregado: { etiqueta: "Entregado", color: "#546E7A", fondo: "#ECEFF1" },

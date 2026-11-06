@@ -46,10 +46,15 @@ La API corre en la PC (`node index.js`) y el celular la consume por la red Wi-Fi
 - Mis pedidos con estados y cancelación solo mientras el pedido esté `recibido`.
 
 ### Vendedor
-- Panel de inventario con las existencias reales y botones para subir ( **+** ) o bajar ( **−** ) el stock de cada producto.
-- Gestión de pedidos: `recibido` → `en preparación` → `listo` → `entregado`.
-- Al pasar a preparación, el servidor descuenta inventario de forma transaccional.
-- Si falta inventario, puede **proponer una sustitución** al comprador, quien la acepta o rechaza (el total se recalcula en el servidor).
+- Panel de inventario con las existencias reales y **dos formas de ajustar el stock**: pasos rápidos ( **+** / **−** ) o **escribiendo la cantidad exacta** y presionando "Guardar".
+- **Crear y editar productos con formulario** (nombre, descripción, precio, unidad, categoría, productor, disponibilidad): nadie escribe IDs de Firestore; el id lo asigna el servidor al crear y la app lo maneja internamente.
+- **Imagen del producto por URL**: en el formulario se pega el enlace de una foto (como el de los productos ya cargados) y se guarda en `imagenUrl`; el catálogo la muestra con `<Image>`. No depende de Storage ni del plan del proyecto. La API también incluye `POST /api/productos/:id/imagen` por si el proyecto pasa a plan Blaze y se quiere subir fotos del teléfono a Storage.
+- **Archivado de productos** (borrado lógico): sale del catálogo público pero se conserva en Firestore; la sección "Archivados" del panel permite restaurarlos con un toque.
+- **Mensajes** claros de éxito, validaciones (nombre y precio obligatorios, cantidad entera mayor o igual a 0) y errores en cada acción.
+- **Gestión de pedidos como tickets**: lista con filtros por estado (Activos, Esperando comprador, En preparación… con conteo), rango de fechas (hoy / 7 / 30 días) y búsqueda por id, comprador o producto. El detalle de cada ticket muestra comprador, productos con cantidades y precios, subtotal por línea, total y fecha.
+- **Seguimiento del ticket**: línea de estados `recibido → en preparación → listo → entregado`, guía de acción por estado (cuándo puede prepararse, cuándo espera la respuesta del comprador a una propuesta) y botones de transición validados por la API.
+- **Sustituciones sin IDs**: selector con búsqueda por nombre para elegir el producto de reemplazo; el ítem a reemplazar se elige tocando "Reemplazar" en la línea del producto (o automático si hay uno agotado) y la propuesta se confirma antes de enviarla al comprador.
+- Al pasar a preparación, el servidor descuenta inventario de forma transaccional; si falta, la propuesta de reemplazo pasa por el comprador (el total se recalcula en el servidor).
 
 ### Administrador
 - Todo lo del vendedor: ve y edita el inventario con + / − (sección al inicio de su panel).
@@ -74,6 +79,7 @@ La app separa el acceso en `comprador`, `vendedor` y `administrador` (los perfil
 |---|:---:|:---:|:---:|:---:|
 | Ver catálogo (`/api/catalogo`) | ❌ 401 | ✅ | ✅ | ✅ |
 | Ver inventario (`/api/inventario`) | ❌ 401 | ❌ 403 | ✅ | ✅ |
+| Crear / archivar productos (`POST`/`DELETE /api/productos`) | ❌ 401 | ❌ 403 | ✅ | ✅ |
 | Editar stock (`PATCH /api/productos/:id`) | ❌ 401 | ❌ 403 | ✅ | ✅ |
 | Crear / cancelar pedidos | ❌ 401 | ✅ | ❌ | ❌ |
 | Gestionar pedidos y sustituciones | ❌ 401 | ❌ 403 | ✅ | ✅ |
@@ -109,8 +115,11 @@ Todas las rutas (excepto `/health`) exigen el encabezado `Authorization: Bearer 
 |---|---|---|
 | `GET /health` | público | Verificación de que la API está viva |
 | `GET /api/catalogo` | cualquier autenticado | Vista pública del catálogo **sin stock** |
-| `GET /api/inventario` | vendedor, administrador | Documentos completos con existencias |
-| `PATCH /api/productos/:id` | vendedor, administrador | Actualiza el stock de un producto |
+| `GET /api/inventario` | vendedor, administrador | Vista normalizada con existencias y estado `activo` |
+| `POST /api/productos` | vendedor, administrador | Crea un producto (el ID lo asigna Firestore, no se escribe a mano) |
+| `PATCH /api/productos/:id` | vendedor, administrador | Actualiza campos (nombre, precio, stock escrito, activo…) |
+| `DELETE /api/productos/:id` | vendedor, administrador | **Archiva** el producto (borrado lógico: sale del catálogo público) |
+| `POST /api/productos/:id/imagen` | vendedor, administrador | Sube una foto del teléfono a Firebase Storage y deja la URL pública en `imagenUrl` |
 | `POST /api/pedidos` | comprador | Crea el pedido validando y descontando stock (transacción) |
 | `GET /api/pedidos` | todos autenticados | Comprador: solo los suyos. Personal: todos |
 | `PATCH /api/pedidos/:id` | vendedor, administrador | Estados `en_preparacion`, `listo`, `entregado` |
@@ -124,7 +133,7 @@ Todas las rutas (excepto `/health`) exigen el encabezado `Authorization: Bearer 
 | Colección | Uso | Campos principales |
 |---|---|---|
 | `usuarios` | Perfil creado al registrarse | nombre, correo, rol, género |
-| `Productos` | Catálogo semanal | nombre, descripcion, precio, unidad, **disponibilidad** (privado), categoria, productor, imagenUrl, activo |
+| `Productos` | Catálogo semanal | nombre, descripcion, precio, unidad, **disponibilidad** (privado), categoria, productor, imagenUrl, activo, creadoEn, actualizadoEn, archivadoEn (solo archivados) |
 | `pedidos` | Pedidos confirmados | usuarioId, generoComprador, items[{productoId, nombre, precio, cantidad, unidad}], total, estado, creadoEn |
 
 Estados de un pedido: `recibido` → `en_preparacion` → `listo` → `entregado` (y `cancelado` solo desde `recibido`; `cambio_pendiente` mientras hay sustitución en regla).
@@ -136,7 +145,7 @@ Estados de un pedido: `recibido` → `en_preparacion` → `listo` → `entregado
 ### Requisitos
 
 - Node.js 18 o superior
-- Expo Go instalado en el celular (misma versión del SDK que el proyecto, **58**)
+- Expo Go instalado en el celular (misma versión del SDK que el proyecto, **58**) — o solo un navegador, con el **modo web** (ver abajo)
 - PC y celular conectados a la **misma red Wi-Fi**
 
 ### Pasos
@@ -148,10 +157,11 @@ Estados de un pedido: `recibido` → `en_preparacion` → `listo` → `entregado
    cd api && npm install
    ```
 
-2. **Verificar variables de entorno** (ya están creadas):
+2. **Variables de entorno** (ya están creadas y casi no se tocan):
 
-   - `.env` (raíz): `EXPO_PUBLIC_API_URL=http://192.168.10.14:3001` — la IP local de la PC. Cámbiala si tu red asigna otra dirección (`ipconfig` → *Dirección IPv4*).
-   - `api/.env`: `PORT=3001`, `FIREBASE_PROJECT_ID`, `CORS_ORIGIN=*` y `GOOGLE_APPLICATION_CREDENTIALS=./service.account.json`.
+   - La app **deduce sola la IP de la PC** desde la conexión de Expo (`expo-constants`): cualquier PC y cualquier red funcionan sin editar archivos (`src/services/apiClient.js`).
+   - `.env` (raíz): solo respaldo para la versión web o builds de producción (`localhost` por defecto).
+   - `api/.env`: `PORT=3001`, `FIREBASE_PROJECT_ID`, `CORS_ORIGIN` y `GOOGLE_APPLICATION_CREDENTIALS=./service.account.json`.
 
 3. **Iniciar la API** (terminal 1):
 
@@ -160,7 +170,7 @@ Estados de un pedido: `recibido` → `en_preparacion` → `listo` → `entregado
    npm start
    ```
 
-   Verificación: abre `http://localhost:3001/health` → debe responder `{"ok":true}`. Desde el celular: `http://192.168.10.14:3001/health`.
+   Verificación: abre `http://localhost:3001/health` → debe responder `{"ok":true}`. Desde el celular, usa la misma IP de la PC que aparece en la terminal de Expo (`exp://192.168.x.x:8081`).
 
 4. **Iniciar la app** (terminal 2, desde la raíz):
 
@@ -175,12 +185,40 @@ Estados de un pedido: `recibido` → `en_preparacion` → `listo` → `entregado
    - Regístrate desde la app (eso crea un **comprador**).
    - Para una cuenta de vendedor o administrador: en Firebase Console → Authentication, copia el **UID** del usuario, y en Firestore edita `usuarios/{uid}` con `rol: "vendedor"` o `"administrador"`.
 
+### Cuentas de Expo (importante en iPhone físico)
+
+Desde **Expo Go 57+** (política de Expo, sep 2026), al abrir un proyecto de desarrollo en un **iPhone físico**, Expo CLI (PC) y Expo Go (celular) deben estar logueados **con la misma cuenta de Expo**. Recomendado para el equipo:
+
+1. En la PC: `npx expo login` con la cuenta del equipo.
+2. En **cada** iPhone: Expo Go → ícono de cuenta → Log in con la **misma** cuenta.
+3. `npm start -- --clear` y escanear el QR.
+
+La cuenta de Expo Go es solo el "cargador" del proyecto: **no tiene nada que ver con las cuentas de MercaVerde**. Cada teléfono entra a la app con su propio correo de Firebase (uno como comprador, otro como vendedor, etc.). En **Android** y en el **modo web** no se exige ninguna cuenta de Expo.
+
+### Modo web: acceso sin cuenta (navegador)
+
+La app también corre como **web**: cualquier persona la abre en el navegador con solo la URL, sin Expo Go y sin cuenta de Expo (funciona igual en iPhone/Android/PC):
+
+1. Con `npm start` corriendo, presiona **`w`** (Metro también sirve la versión web).
+2. Comparte la URL: `http://<IP de la PC>:8081` (la IP que muestra la terminal de Expo).
+3. Cada quien inicia sesión en MercaVerde con el correo de Firebase que tenga; mismo catálogo, carrito, tickets y panel.
+
+La IP de la API se deduce del navegador solo (`src/services/apiClient.js`), así que funciona en cualquier PC y red sin editar archivos. El puerto 8081 también debe permitirlo el firewall de Windows en redes nuevas (misma regla que el 3001, del paso anterior).
+
 ### Limpiar procesos y puertos ( WINDOWS )
 
 Si el puerto 3001 u 8081 quedan ocupados por una ejecución anterior:
 
 ```powershell
 taskkill /F /IM node.exe
+```
+
+### Firewall de Windows (solo la primera vez en una PC nueva)
+
+La primera vez que la API arranca, Windows pregunta "¿Permitir acceso a…?": hay que aceptar marcando **tanto redes privadas como públicas**, o el celular no podrá llegar al puerto 3001 aunque la API esté corriendo. Si ya se rechazó, se agrega la regla a mano (PowerShell como administrador):
+
+```powershell
+netsh advfirewall firewall add rule name="MercaVerde API 3001" dir=in action=allow protocol=TCP localport=3001
 ```
 
 ## Cómo probar

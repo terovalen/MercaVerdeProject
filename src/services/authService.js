@@ -9,6 +9,7 @@ import {
 } from "firebase/auth";
 import { doc, setDoc, serverTimestamp } from "firebase/firestore";
 import { auth, db } from "./firebaseConfig";
+import { conTiempoLimite } from "../utils/conTiempoLimite";
 
 /**
  * Registra un nuevo usuario y crea su documento en la colección "usuarios".
@@ -32,7 +33,9 @@ export async function registrarUsuario({ nombre, correo, contrasena, genero = "p
 
 export async function obtenerPerfil(uid) {
   const { getDoc, doc } = await import("firebase/firestore");
-  const perfil = await getDoc(doc(db, "usuarios", uid));
+  // Con tiempo límite: un Firestore inalcanzable no debe retrasar la entrada
+  // a la app; AuthContext asume rol comprador si no responde en 10 s.
+  const perfil = await conTiempoLimite(getDoc(doc(db, "usuarios", uid)), 10000);
   const data = perfil.exists() ? perfil.data() : { rol: "comprador" };
   return { ...data, rol: data.rol === "cliente" ? "comprador" : (data.rol || "comprador") };
 }

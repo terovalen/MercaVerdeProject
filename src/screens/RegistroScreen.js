@@ -6,10 +6,10 @@ import {
   TextInput,
   TouchableOpacity,
   StyleSheet,
-  Alert,
   ActivityIndicator,
 } from "react-native";
 import { registrarUsuario } from "../services/authService";
+import usarDialogos from "../components/usarDialogos";
 
 export default function RegistroScreen({ navigation }) {
   const [nombre, setNombre] = useState("");
@@ -17,14 +17,15 @@ export default function RegistroScreen({ navigation }) {
   const [contrasena, setContrasena] = useState("");
   const [genero, setGenero] = useState("");
   const [cargando, setCargando] = useState(false);
+  const { caja: dialogos, avisar } = usarDialogos();
 
   async function manejarRegistro() {
     if (!nombre || !correo || !contrasena || !genero) {
-      Alert.alert("Datos incompletos", "Completa todos los campos.");
+      avisar("Datos incompletos", "Completa todos los campos.");
       return;
     }
     if (contrasena.length < 6) {
-      Alert.alert("Contraseña muy corta", "Debe tener al menos 6 caracteres.");
+      avisar("Contraseña muy corta", "Debe tener al menos 6 caracteres.");
       return;
     }
     setCargando(true);
@@ -32,7 +33,7 @@ export default function RegistroScreen({ navigation }) {
       await registrarUsuario({ nombre, correo, contrasena, genero });
       // AuthContext detecta la sesión y navega automáticamente
     } catch (error) {
-      Alert.alert("No se pudo registrar", traducirError(error.code));
+      avisar("No se pudo registrar", traducirError(error.code));
     } finally {
       setCargando(false);
     }
@@ -86,6 +87,7 @@ export default function RegistroScreen({ navigation }) {
       <TouchableOpacity onPress={() => navigation.goBack()}>
         <Text style={styles.enlace}>Ya tengo cuenta, iniciar sesión</Text>
       </TouchableOpacity>
+      {dialogos}
     </View>
   );
 }

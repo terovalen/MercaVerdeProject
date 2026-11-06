@@ -35,6 +35,7 @@ export default function CatalogoScreen({ navigation }) {
   const [cargando, setCargando] = useState(true);
   const [refrescando, setRefrescando] = useState(false);
   const [aviso, setAviso] = useState(null);
+  const [falloRed, setFalloRed] = useState(false);
   const [actualizadoEn, setActualizadoEn] = useState(null);
 
   /**
@@ -49,7 +50,10 @@ export default function CatalogoScreen({ navigation }) {
     setProductos(resultado.productos);
     setActualizadoEn(resultado.actualizadoEn);
     setAviso(resultado.aviso);
-    setCargando(enLinea == null && resultado.productos.length === 0);
+    setFalloRed(resultado.falloRed === true);
+    // El caso de uso ya resuelve caché y red (con tiempo límite):
+    // no queda nunca esperando un estado de conexión indefinido.
+    setCargando(false);
   }, [usuario?.uid, enLinea]);
 
   useFocusEffect(
@@ -79,6 +83,22 @@ export default function CatalogoScreen({ navigation }) {
       <View style={styles.centrado}>
         <ActivityIndicator size="large" color="#2E7D32" />
         <Text style={styles.cargandoTexto}>Cargando catálogo…</Text>
+      </View>
+    );
+  }
+
+  // Falló la conexión con el servidor y no hay copia local: pantalla de error
+  // clara con reintento, en lugar de un spinner que corre para siempre.
+  if (falloRed) {
+    return (
+      <View style={styles.centrado}>
+        <Text style={styles.errorTitulo}>No se pudo conectar con la tienda</Text>
+        <Text style={styles.errorTexto}>
+          {aviso || "Revisa tu conexión y vuelve a intentar."}
+        </Text>
+        <TouchableOpacity style={styles.botonReintentar} onPress={manejarRefresh}>
+          <Text style={styles.botonReintentarTexto}>Volver a intentar</Text>
+        </TouchableOpacity>
       </View>
     );
   }
@@ -157,6 +177,16 @@ const styles = StyleSheet.create({
   contenedor: { flex: 1, backgroundColor: "#F4F7F1", paddingTop: 12, paddingHorizontal: 16 },
   centrado: { flex: 1, justifyContent: "center", alignItems: "center", backgroundColor: "#F4F7F1" },
   cargandoTexto: { marginTop: 8, color: "#5A6B57" },
+  errorTitulo: { fontSize: 18, fontWeight: "700", color: "#2B2F2B", textAlign: "center" },
+  errorTexto: { marginTop: 8, color: "#5A6B57", textAlign: "center", paddingHorizontal: 24, lineHeight: 20 },
+  botonReintentar: {
+    marginTop: 20,
+    backgroundColor: "#2E7D32",
+    borderRadius: 12,
+    paddingHorizontal: 32,
+    paddingVertical: 14,
+  },
+  botonReintentarTexto: { color: "#fff", fontWeight: "700", fontSize: 15 },
   encabezado: {
     flexDirection: "row",
     justifyContent: "space-between",

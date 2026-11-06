@@ -3,15 +3,17 @@ import express from "express";
 import { applicationDefault, initializeApp } from "firebase-admin/app";
 import { getAuth } from "firebase-admin/auth";
 import { getFirestore, FieldValue } from "firebase-admin/firestore";
+import { getStorage } from "firebase-admin/storage";
 
 initializeApp({ credential: applicationDefault(), projectId: process.env.FIREBASE_PROJECT_ID || "mercaverde-2a8ad" });
 const db = getFirestore();
 const app = express();
-app.use(express.json({ limit: "1mb" }));
+// 5mb: las imágenes llegan como base64 (un ~37% más grandes que el original).
+app.use(express.json({ limit: "5mb" }));
 app.use((req, res, next) => {
   res.setHeader("Access-Control-Allow-Origin", process.env.CORS_ORIGIN || "*");
   res.setHeader("Access-Control-Allow-Headers", "Authorization, Content-Type");
-  res.setHeader("Access-Control-Allow-Methods", "GET, POST, PATCH, OPTIONS");
+  res.setHeader("Access-Control-Allow-Methods", "GET, POST, PATCH, DELETE, OPTIONS");
   if (req.method === "OPTIONS") return res.sendStatus(204);
   next();
 });
@@ -72,21 +74,66 @@ function stockDe(data = {}) {
   return 0;
 }
 
+/**
+ * Validación y normalización de campos de producto.
+ * Devuelve { datos, errores }: los datos limpios listos para Firestore y
+ * los mensajes de error para devolver al formulario. En modo parcial
+ * (edición), los campos que no llegan no bloquean.
+ */
+function validacionesProducto(cuerpo = {}, { parcial = false } = {}) {
+  const datos = {};
+  const errores = [];
+  const obliga = (campo, rv) => (cuerpo[campo] !== undefined || !parcial) ? rv() : null;
+
+  obliga("nombre", () => {
+    const nombre = String(cuerpo.nombre ?? "").trim();
+    if (!nombre) errores.push("El nombre es obligatorio.");
+    else datos.nombre = nombre.slice(0, 120);
+  });
+  if (cuerpo.descripcion !== undefined) datos.descripcion = String(cuerpo.descripcion).trim().slice(0, 500);
+  obliga("precio", () => {
+    const precio = Number(cuerpo.precio);
+    if (!Number.isFinite(precio) || precio < 0) errores.push("El precio debe ser un número mayor o igual a 0.");
+    else datos.precio = precio;
+  });
+  obliga("unidad", () => { datos.unidad = String(cuerpo.unidad || "").trim() || "unidad"; });
+  obliga("categoria", () => { datos.categoria = String(cuerpo.categoria || "").trim() || "Sin categoría"; });
+  if (cuerpo.productor !== undefined) datos.productor = String(cuerpo.productor).trim().slice(0, 120);
+  if (cuerpo.imagenUrl !== undefined) datos.imagenUrl = String(cuerpo.imagenUrl).trim();
+  if (cuerpo.disponibilidad !== undefined) {
+    const stock = Math.trunc(Number(cuerpo.disponibilidad));
+    if (!Number.isFinite(stock) || stock < 0 || Number(cuerpo.disponibilidad) !== stock) {
+      errores.push("La disponibilidad debe ser un número entero igual o mayor a 0.");
+    } else datos.disponibilidad = stock;
+  }
+  if (cuerpo.activo !== undefined) datos.activo = Boolean(cuerpo.activo);
+  return { datos, errores };
+}
+
 app.get("/health", (_req, res) => res.json({ ok: true }));
 app.get("/api/catalogo", autenticar, async (_req, res) => {
   const snap = await db.collection("Productos").get();
-  res.json(snap.docs.map(d => ({ id: d.id, ...vistaPublica(d.data()) })));
+  // Los productos archivados (activo = false) no aparecen en el catálogo público.
+  res.json(snap.docs
+    .filter(d => d.data().Activo ?? d.data().activo !== false)
+    .map(d => ({ id: d.id, ...vistaPublica(d.data()) })));
 });
+/**
+ * Vista de inventario: todos los campos canónicos de la vista pública más
+ * las existencias. Así el panel y el formulario de edición trabajan con un
+ * solo formato aunque el documento antiguo tenga campos en mayúscula.
+ */
+function vistaInventario(data = {}) {
+  return {
+    ...vistaPublica(data),
+    disponibilidad: stockDe(data),
+    activo: data.activo ?? data.Activo !== false,
+  };
+}
+
 app.get("/api/inventario", autenticar, permitir("vendedor", "administrador"), async (_req, res) => {
   const snap = await db.collection("Productos").get();
-  res.json(snap.docs.map(d => {
-    const data = d.data();
-    // Se entrega la existencias como un único campo "disponibilidad",
-    // aunque el documento lo tenga duplicado con otra mayúscula o espacios.
-    const datos = { ...data };
-    for (const nombre of ["Disponibilidad", "Disponibilidad ", "disponibilidad "]) delete datos[nombre];
-    return { id: d.id, ...datos, disponibilidad: stockDe(data) };
-  }));
+  res.json(snap.docs.map(d => ({ id: d.id, ...vistaInventario(d.data()) })));
 });
 app.post("/api/pedidos", autenticar, permitir("comprador"), async (req, res) => {
   try {
@@ -206,9 +253,20 @@ app.patch("/api/pedidos/:id/respuesta-cambio", autenticar, permitir("comprador")
     }); res.json({ ok: true });
   } catch (e) { error(res, e); }
 });
+/** Crea un producto. El ID lo asigna Firestore; nadie escribe IDs a mano. */
+app.post("/api/productos", autenticar, permitir("vendedor", "administrador"), async (req, res) => {
+  const { datos, errores } = validacionesProducto(req.body);
+  if (errores.length) return res.status(400).json({ error: errores[0], errores });
+  try {
+    const ref = db.collection("Productos").doc();
+    await ref.set({ ...datos, activo: datos.activo ?? true, creadoEn: FieldValue.serverTimestamp(), actualizadoEn: FieldValue.serverTimestamp() });
+    res.status(201).json({ ok: true, id: ref.id, mensaje: "Producto creado." });
+  } catch (e) { error(res, e); }
+});
+
 app.patch("/api/productos/:id", autenticar, permitir("vendedor", "administrador"), async (req, res) => {
-  const stock = Number(req.body.disponibilidad);
-  if (!Number.isFinite(stock) || stock < 0) return res.status(400).json({ error: "Inventario inválido." });
+  const { datos, errores } = validacionesProducto(req.body, { parcial: true });
+  if (errores.length) return res.status(400).json({ error: errores[0], errores });
   try {
     const ref = db.collection("Productos").doc(req.params.id);
     const snap = await ref.get();
@@ -216,13 +274,67 @@ app.patch("/api/productos/:id", autenticar, permitir("vendedor", "administrador"
     // Escribe el campo canónico "disponibilidad" y borra las variantes
     // duplicadas ("Disponibilidad", "Disponibilidad " con espacio) para que
     // consola, panel y validaciones de pedidos vean siempre el mismo número.
-    const cambios = { disponibilidad: stock };
-    for (const nombre of ["Disponibilidad", "Disponibilidad ", "disponibilidad "]) {
-      if (snap.data()[nombre] !== undefined) cambios[nombre] = FieldValue.delete();
+    const cambios = { ...datos, actualizadoEn: FieldValue.serverTimestamp() };
+    // Al escribir un campo canónico borramos su variante mayúscula si existe
+    // (documentos viejos con "Activo", "Disponibilidad ", etc.), para que no
+    // queden duplicados que anulen el cambio (p. ej. un archivado ignorado).
+    for (const nombre of ["Disponibilidad", "Disponibilidad ", "disponibilidad ", "Activo"]) {
+      const campo = nombre.trim().toLowerCase();
+      if (datos[campo] !== undefined && snap.data()[nombre] !== undefined) {
+        cambios[nombre] = FieldValue.delete();
+      }
     }
     await ref.update(cambios);
-    res.json({ ok: true });
+    res.json({ ok: true, mensaje: "Producto actualizado." });
   } catch (e) { error(res, e); }
+});
+
+/** Archivado (borrado lógico): el producto sale del catálogo público pero
+ *  se conserva en Firestore con sus datos y sus pedidos históricos. */
+app.delete("/api/productos/:id", autenticar, permitir("vendedor", "administrador"), async (req, res) => {
+  try {
+    const ref = db.collection("Productos").doc(req.params.id);
+    const snap = await ref.get();
+    if (!snap.exists) return res.status(404).json({ error: "Producto no encontrado." });
+    await ref.update({
+      activo: false,
+      archivadoEn: FieldValue.serverTimestamp(),
+      actualizadoEn: FieldValue.serverTimestamp(),
+      // Borra la variante "Activo" de los documentos viejos para que el
+      // archivado no quede anulado por el campo en mayúscula.
+      ...(snap.data().Activo !== undefined ? { Activo: FieldValue.delete() } : {}),
+    });
+    res.json({ ok: true, mensaje: "Producto archivado: ya no aparece en el catálogo público." });
+  } catch (e) { error(res, e); }
+});
+
+/** Carga de imagen desde el teléfono hacia Firebase Storage.
+ *  Recibe base64, la guarda bajo productos/<id>/ y deja la URL pública en
+ *  el campo imagenUrl del documento. */
+app.post("/api/productos/:id/imagen", autenticar, permitir("vendedor", "administrador"), async (req, res) => {
+  const { base64, nombreArchivo, tipo } = req.body || {};
+  if (!base64 || typeof base64 !== "string") return res.status(400).json({ error: "No llegó ninguna imagen para subir." });
+  try {
+    const ref = db.collection("Productos").doc(req.params.id);
+    const snap = await ref.get();
+    if (!snap.exists) return res.status(404).json({ error: "Producto no encontrado." });
+    const bytes = Buffer.from(base64, "base64");
+    if (!bytes.length) return res.status(400).json({ error: "La imagen llegó vacía o corrupta." });
+    if (bytes.length > 4000000) return res.status(400).json({ error: "La imagen pesa más de 4 MB. Elige una más liviana o de menor calidad." });
+    const bucket = getStorage().bucket();
+    const ruta = `productos/${req.params.id}/${nombreArchivo || `imagen-${Date.now()}`}`;
+    await bucket.file(ruta).save(bytes, { contentType: tipo || "image/jpeg", resumable: false });
+    await bucket.file(ruta).makePublic();
+    const url = `https://storage.googleapis.com/${bucket.name}/${ruta}`;
+    await ref.update({ imagenUrl: url, actualizadoEn: FieldValue.serverTimestamp() });
+    res.json({ ok: true, url, mensaje: "Imagen cargada y guardada en el producto." });
+  } catch (e) {
+    // Proyecto sin bucket (Storage requiere plan Blaze): mensaje claro en vez de un 500 críptico.
+    if (String(e.message).toLowerCase().includes("bucket")) {
+      return res.status(400).json({ error: "El proyecto de Firebase no tiene Cloud Storage activado (requiere plan Blaze). Se puede poner la imagen pegando una URL en el formulario." });
+    }
+    error(res, e);
+  }
 });
 app.get("/api/analitica", autenticar, permitir("administrador"), async (_req, res) => {
   const [os, ps, us] = await Promise.all([db.collection("pedidos").get(), db.collection("Productos").get(), db.collection("usuarios").get()]);

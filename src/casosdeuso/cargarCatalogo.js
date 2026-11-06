@@ -50,12 +50,16 @@ export async function cargarCatalogoDelUsuario(usuarioId, enLinea, alTenerCache)
       aviso: null,
     };
   } catch (error) {
+    const esRed = error.esDeRed === true || esErrorDeRed(error);
     return {
       productos: productosCache,
       actualizadoEn: cache?.actualizadoEn || null,
       desdeCache: true,
-      aviso: esErrorDeRed(error)
-        ? "No se pudo actualizar el catálogo. Sigues viendo la última copia guardada."
+      falloRed: esRed && productosCache.length === 0,
+      aviso: esRed
+        ? error.esDeRed
+          ? error.message
+          : "No se pudo actualizar el catálogo. Sigues viendo la última copia guardada."
         : error.message || "No se pudo leer el catálogo.",
     };
   }

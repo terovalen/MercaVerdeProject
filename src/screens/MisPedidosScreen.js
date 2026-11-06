@@ -1,5 +1,5 @@
 // src/screens/MisPedidosScreen.js
-import React, { useCallback, useState } from "react";
+import React, { useCallback, useEffect, useState } from "react";
 import {
   View,
   Text,
@@ -121,6 +121,17 @@ export default function MisPedidosScreen({ navigation }) {
       setRefrescando(false);
     }
   }
+
+  // Refresco automático: pedidos nuevos, cambios de estado del vendedor
+  // o respuestas a propuestas aparecen solos sin volver a entrar a la pantalla.
+  useEffect(() => {
+    if (enLinea !== true) return;
+    const id = setInterval(async () => {
+      await sincronizar();
+      await cargar();
+    }, 7000);
+    return () => clearInterval(id);
+  }, [sincronizar, cargar, enLinea]);
 
   async function responderCambio(pedido, aceptar) {
     try {
