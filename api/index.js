@@ -33,7 +33,12 @@ async function autenticar(req, res, next) {
     const perfil = await db.collection("usuarios").doc(req.identidad.uid).get();
     req.perfil = perfil.data() || { rol: "comprador" };
     next();
-  } catch { res.status(401).json({ error: "Sesión inválida." }); }
+  } catch (e) {
+    // Va a los logs del servidor (Runtime Logs de Vercel): como el usuario solo
+    // recibe el aviso genérico, sin esta línea no se sabe la causa real.
+    console.error("autenticar falló:", e?.message || e);
+    res.status(401).json({ error: "Sesión inválida." });
+  }
 }
 const permitir = (...roles) => (req, res, next) => (roles.includes(req.perfil?.rol) || (req.perfil?.rol === "cliente" && roles.includes("comprador"))) ? next() : res.status(403).json({ error: "No tienes permisos para esta operación." });
 const error = (res, e) => res.status(400).json({ error: e.message || "Solicitud inválida." });
