@@ -429,6 +429,8 @@ app.get("/api/analitica", autenticar, permitir("administrador"), async (_req, re
 const port = Number(process.env.PORT || 3001);
 // En Vercel la API corre como función serverless: el runtime maneja las
 // peticiones y no le toca a la app quedarse escuchando en un puerto.
+// Vercel recibe la app por este export y la ejecuta por su cuenta.
+export default app;
 if (process.env.VERCEL !== "1") {
   app.listen(port, () => console.log(`MercaVerde API escuchando en ${port}`));
 }
