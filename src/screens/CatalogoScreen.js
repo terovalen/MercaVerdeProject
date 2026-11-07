@@ -164,11 +164,11 @@ export default function CatalogoScreen({ navigation }) {
         )}
       />
 
-      <TouchableOpacity style={styles.botonCarrito} onPress={() => navigation.navigate("Carrito")}>
-        <Text style={styles.botonCarritoTexto}>
-          Ver pedido {totalItemsCarrito > 0 ? `(${totalItemsCarrito})` : ""}
-        </Text>
-      </TouchableOpacity>
+      {totalItemsCarrito > 0 ? (
+        <TouchableOpacity style={styles.botonCarrito} onPress={() => navigation.navigate("Carrito")}>
+          <Text style={styles.botonCarritoTexto}>Ver pedido ({totalItemsCarrito})</Text>
+        </TouchableOpacity>
+      ) : null}
     </View>
   );
 }

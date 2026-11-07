@@ -18,6 +18,7 @@ import { useSync } from "../context/SyncContext";
 import TarjetaPedido from "../components/TarjetaPedido";
 import Dialogo from "../components/Dialogo";
 import { apiRequest } from "../services/apiClient";
+import { formatearFecha } from "../utils/formato";
 
 export default function MisPedidosScreen({ navigation }) {
   const { usuario } = useAuth();
@@ -167,8 +168,29 @@ export default function MisPedidosScreen({ navigation }) {
         }
         renderItem={({ item }) => (
           <View>
-            <TarjetaPedido pedido={item} onCancelar={pedirCancelacion} onReintentar={manejarReintento} />
-            {item.estado === "cambio_pendiente" ? <View style={{ backgroundColor: "#FFF8E1", padding: 12, borderRadius: 10, marginBottom: 10 }}><Text style={{ fontWeight: "700", color: "#8D5B00" }}>El vendedor propone cambiar los productos</Text><Text>{item.motivoCambio || "Por disponibilidad de inventario"}</Text>{(item.itemsPropuestos || []).map(i => <Text key={i.productoId}>{i.cantidad} × {i.nombre}</Text>)}<View style={{ flexDirection: "row", gap: 8, marginTop: 8 }}><Text onPress={() => responderCambio(item, true)} style={{ color: "#2E7D32", fontWeight: "700", padding: 8 }}>Aceptar cambios</Text><Text onPress={() => responderCambio(item, false)} style={{ color: "#C62828", fontWeight: "700", padding: 8 }}>Rechazar</Text></View></View> : null}
+            <TarjetaPedido
+              pedido={item}
+              onCancelar={pedirCancelacion}
+              onReintentar={manejarReintento}
+              onPagar={(pedido) => navigation.navigate("PagoScreen", { pedidoId: pedido.id })}
+            />
+            {item.eliminado ? (
+              <View style={{ backgroundColor: "#FFEBEE", padding: 12, borderRadius: 10, marginBottom: 10 }}>
+                <Text style={{ fontWeight: "700", color: "#C62828" }}>Este pedido fue eliminado por el vendedor.</Text>
+                {item.eliminadoPor ? <Text style={{ color: "#5A6B57", fontSize: 12 }}>Eliminado por: {item.eliminadoPor}</Text> : null}
+                {item.eliminadoEn ? <Text style={{ color: "#5A6B57", fontSize: 12 }}>Fecha: {formatearFecha(item.eliminadoEn)}</Text> : null}
+              </View>
+            ) : item.estado === "cambio_pendiente" ? (
+              <View style={{ backgroundColor: "#FFF8E1", padding: 12, borderRadius: 10, marginBottom: 10 }}>
+                <Text style={{ fontWeight: "700", color: "#8D5B00" }}>El vendedor propone cambiar los productos</Text>
+                <Text>{item.motivoCambio || "Por disponibilidad de inventario"}</Text>
+                {(item.itemsPropuestos || []).map(i => <Text key={i.productoId}>{i.cantidad} × {i.nombre}</Text>)}
+                <View style={{ flexDirection: "row", gap: 8, marginTop: 8 }}>
+                  <Text onPress={() => responderCambio(item, true)} style={{ color: "#2E7D32", fontWeight: "700", padding: 8 }}>Aceptar cambios</Text>
+                  <Text onPress={() => responderCambio(item, false)} style={{ color: "#C62828", fontWeight: "700", padding: 8 }}>Rechazar</Text>
+                </View>
+              </View>
+            ) : null}
           </View>
         )}
       />

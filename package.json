@@ -18,7 +18,6 @@
     "expo": "~58.0.21",
     "expo-constants": "~58.0.15",
     "expo-dev-client": "~58.0.0",
-    "expo-image-picker": "~58.0.10",
     "expo-status-bar": "~58.0.0",
     "firebase": "^12",
     "react": "19.3.0",

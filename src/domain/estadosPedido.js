@@ -5,7 +5,7 @@
  */
 
 export const ESTADOS_PEDIDO = {
-  RECIBIDO: "recibido",
+  PENDIENTE: "pendiente",
   EN_PREPARACION: "en_preparacion",
   LISTO: "listo",
   ENTREGADO: "entregado",
@@ -18,12 +18,12 @@ export const ESTADOS_PEDIDO = {
  * para que el mismo estado se vea igual en la lista y en el detalle.
  */
 const META_ESTADO = {
-  recibido: { etiqueta: "Recibido", color: "#1565C0", fondo: "#E3F2FD" },
-  cambio_pendiente: { etiqueta: "Cambio pendiente", color: "#8D5B00", fondo: "#FFF8E1" },
-  en_preparacion: { etiqueta: "En preparación", color: "#EF6C00", fondo: "#FFF3E0" },
+  pendiente: { etiqueta: "Pendiente", color: "#FF9800", fondo: "#FFF8E1" },
+  en_preparacion: { etiqueta: "En preparación", color: "#1565C0", fondo: "#E3F2FD" },
   listo: { etiqueta: "Listo", color: "#2E7D32", fondo: "#E8F5E9" },
   entregado: { etiqueta: "Entregado", color: "#546E7A", fondo: "#ECEFF1" },
   cancelado: { etiqueta: "Cancelado", color: "#C62828", fondo: "#FFEBEE" },
+  cambio_pendiente: { etiqueta: "Cambio pendiente", color: "#8D5B00", fondo: "#FFF8E1" },
 };
 
 /**
@@ -42,11 +42,11 @@ export function metaEstado(estado) {
 
 /**
  * Regla de negocio del equipo para cancelar.
- * Sí se puede: recibido y en preparación (el mercado aún no terminó de armarlo).
- * No se puede: listo (ya está preparado), entregado ni cancelado.
+ * Sí se puede: pendiente y en_preparacion (el mercado aún no terminó de armarlo).
+ * No se puede: listo, entregado ni cancelado.
  */
 export function puedeCancelar(estado) {
-  return estado === ESTADOS_PEDIDO.RECIBIDO;
+  return estado === ESTADOS_PEDIDO.PENDIENTE || estado === ESTADOS_PEDIDO.EN_PREPARACION;
 }
 
 /**

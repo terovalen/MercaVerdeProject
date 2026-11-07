@@ -1,7 +1,7 @@
 /**
  * Indicador permanente de conexión.
  * Vive fuera del navegador para que siga visible en catálogo, detalle,
- * carrito, pedidos y alertas.
+ * carrito y pedidos.
  */
 import React from "react";
 import { Text, View } from "react-native";

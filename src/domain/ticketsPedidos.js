@@ -1,38 +1,34 @@
 /**
- * Capa de dominio: tickets de pedidos del panel vendedor/administrador.
- * Decide qué filtrar y qué puede hacerse en cada estado. No conoce
- * Firebase ni redes; las pantallas solo muestran lo que esto determina.
- * Reutiliza las reglas de estadosPedido.js (mismo negocio, misma tabla).
+ * Reglas de los tickets del panel de vendedor y administrador:
+ * qué se filtra y qué se puede hacer en cada estado.
+ * No sabe nada de Firebase ni de la red, solo mira el estado del pedido.
  */
 
 import { ESTADOS_PEDIDO } from "./estadosPedido";
 
-/** Estados que aún requieren trabajo del vendedor (para el filtro "Activos"). */
+/** Estados en los que todavía hay trabajo del vendedor. */
 export const ESTADOS_ACTIVOS = [
-  ESTADOS_PEDIDO.RECIBIDO,
+  ESTADOS_PEDIDO.PENDIENTE,
   ESTADOS_PEDIDO.EN_PREPARACION,
   ESTADOS_PEDIDO.LISTO,
   "cambio_pendiente",
 ];
 
-/** Ruta normal de seguimiento (el comprador la ve igual). */
+/** La ruta normal de un pedido, de principio a fin. */
 export const RUTA_SEGUIMIENTO = [
-  ESTADOS_PEDIDO.RECIBIDO,
+  ESTADOS_PEDIDO.PENDIENTE,
   ESTADOS_PEDIDO.EN_PREPARACION,
   ESTADOS_PEDIDO.LISTO,
   ESTADOS_PEDIDO.ENTREGADO,
 ];
 
 /**
- * Guía del vendedor según el estado: cuándo puede prepararse el pedido
- * y cuándo se espera la respuesta del comprador a una propuesta.
+ * Qué toca hacer en cada estado, desde el punto de vista del vendedor.
  */
 export function accionSegunEstado(estado) {
   switch (estado) {
-    case ESTADOS_PEDIDO.RECIBIDO:
-      return { puedePreparar: true, texto: "Puede prepararse: revisa existencias y toca Preparar." };
-    case "cambio_pendiente":
-      return { puedePreparar: false, texto: "El pedido espera la respuesta del comprador a la propuesta de cambio." };
+    case ESTADOS_PEDIDO.PENDIENTE:
+      return { puedePreparar: false, texto: "Pedido nuevo: revisa el pago y toca Recibir para aceptarlo." };
     case ESTADOS_PEDIDO.EN_PREPARACION:
       return { puedePreparar: false, texto: "Separando el pedido: avisa con Listo cuando esté." };
     case ESTADOS_PEDIDO.LISTO:
@@ -41,6 +37,8 @@ export function accionSegunEstado(estado) {
       return { puedePreparar: false, texto: "Pedido cerrado: ya fue entregado." };
     case ESTADOS_PEDIDO.CANCELADO:
       return { puedePreparar: false, texto: "Pedido cerrado: fue cancelado por el comprador." };
+    case "cambio_pendiente":
+      return { puedePreparar: false, texto: "El pedido espera la respuesta del comprador a la propuesta de cambio." };
     default:
       return { puedePreparar: false, texto: `Estado desconocido: ${estado || "sin estado"}.` };
   }
@@ -51,12 +49,12 @@ export function esperaRespuestaComprador(estado) {
 }
 
 export function puedePreparar(estado) {
-  return estado === ESTADOS_PEDIDO.RECIBIDO;
+  return estado === ESTADOS_PEDIDO.PENDIENTE;
 }
 
 /**
  * Texto corto del chip "Activos"/estado respecto al punto de vista del
- * vendedor (la palabra "cambio_pendiente" cambia de sentido aquí).
+ * vendedor.
  */
 export function etiquetaVendedor(estado) {
   if (estado === ESTADOS_PEDIDO.CAMBIO_PENDIENTE) {
@@ -74,12 +72,8 @@ export const OPCIONES_FECHA = [
 
 /**
  * Filtra los tickets por estado, texto (id, comprador o producto) y rango
- * de fechas. Combina los criterios activos; vacío = sin filtro.
- * criterios = {
- *   estado: "activos" | "todos" | <estado>,
- *   texto: string,
- *   rango: id de OPCIONES_FECHA
- * }
+ * de fechas. Los criterios se combinan; si no hay ninguno, sale todo.
+ * criterios = { estado: "activos" | "todos" | <estado>, texto, rango }
  */
 export function filtrarTickets(pedidos, criterios = {}) {
   const estado = criterios.estado || "todos";
@@ -112,8 +106,8 @@ export function filtrarTickets(pedidos, criterios = {}) {
 }
 
 /**
- * Subtotal por línea y total del ticket, calculados del lado de esta vista
- * para mostrarlos aunque el documento venga sin total (pedidos viejos).
+ * Total del ticket. Si el documento no trae total (pedidos viejos), sale
+ * de la suma de las líneas.
  */
 export function totalDeTicket(pedido) {
   const suma = (pedido.items || []).reduce((n, item) => n + Number(item.precio) * Number(item.cantidad), 0);

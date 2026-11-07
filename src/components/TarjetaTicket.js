@@ -1,9 +1,7 @@
 /**
- * Tarjeta de ticket del panel vendedor/administrador: el detalle del pedido
- * se despliega sobre la misma tarjeta. Muestra comprador, productos,
- * cantidades, precios y total; la línea de seguimiento indica en qué punto
- * va el pedido y la guía de estado dice cuándo puede prepararse y cuándo
- * se espera la respuesta del comprador a una propuesta de cambio.
+ * Ticket de un pedido en el panel de vendedor o administrador.
+ * El detalle se abre y se cierra sobre la misma tarjeta: comprador,
+ * productos, cantidades, precios y total.
  */
 import React, { useState } from "react";
 import { Text, TouchableOpacity, View, StyleSheet } from "react-native";
@@ -15,6 +13,7 @@ import {
   RUTA_SEGUIMIENTO,
 } from "../domain/ticketsPedidos";
 import { formatearPrecio, formatearFecha } from "../utils/formato";
+import usarDialogos from "../components/usarDialogos";
 
 const VERDE = "#2E7D32";
 
@@ -32,15 +31,15 @@ export default function TarjetaTicket({
   onListo,
   onEntregado,
   onProponer,
+  onEliminar,
 }) {
   const [abierto, setAbierto] = useState(false);
   const meta = metaEstado(pedido.estado);
   const guia = accionSegunEstado(pedido.estado);
   const esperandoComprador = esperaRespuestaComprador(pedido.estado);
   const items = pedido.items || [];
+  const { caja: dialogos, confirmar } = usarDialogos();
 
-  // Índice de la línea de seguimiento: cambio_pendiente se muestra en la
-  // casilla de recibido con su propia advertencia (la propuesta está en pausa).
   const indice = RUTA_SEGUIMIENTO.indexOf(pedido.estado);
 
   return (
@@ -71,6 +70,13 @@ export default function TarjetaTicket({
         <Text style={styles.lineaResumen} numberOfLines={2}>
           {items.map(i => `${i.nombre} x${i.cantidad}`).join(", ") || "Sin productos"}
         </Text>
+
+        {/* Estado de pago del pedido */}
+        <View style={[styles.chipPago, pedido.pagado ? styles.chipPagoSi : styles.chipPagoNo]}>
+          <Text style={[styles.chipPagoTexto, pedido.pagado ? styles.chipPagoTextoSi : styles.chipPagoTextoNo]}>
+            {pedido.pagado ? "Pagado" : "No pagado"}
+          </Text>
+        </View>
 
         <View style={{ flexDirection: "row", alignItems: "center", justifyContent: "space-between" }}>
           <Text style={styles.totalTicket}>Total: {formatearPrecio(pedido.total)}</Text>
@@ -120,7 +126,7 @@ export default function TarjetaTicket({
             <Text style={styles.motivoCambio}>Motivo de la propuesta: {pedido.motivoCambio}</Text>
           ) : null}
 
-          {/* Seguimiento: recibido → en preparación → listo → entregado */}
+          {/* Seguimiento */}
           {pedido.estado !== "cancelado" ? (
             <View style={styles.timeline}>
               {RUTA_SEGUIMIENTO.map((paso, i) => {
@@ -152,10 +158,19 @@ export default function TarjetaTicket({
           <View style={styles.acciones}>
             {puedePreparar(pedido.estado) ? (
               <>
+                {!pedido.pagado ? (
+                  <Text style={[styles.guia, styles.guiaEsperando]}>
+                    Esperando pago: no puedes preparar el pedido hasta que el comprador pague.
+                  </Text>
+                ) : null}
                 <TouchableOpacity style={[styles.boton, { backgroundColor: "#E6A700" }]} onPress={() => onProponer?.(null)} disabled={enOperacion}>
                   <Text style={styles.botonTexto}>Proponer reemplazo</Text>
                 </TouchableOpacity>
-                <TouchableOpacity style={[styles.boton, { backgroundColor: VERDE }]} onPress={onPreparar} disabled={enOperacion}>
+                <TouchableOpacity
+                  style={[styles.boton, { backgroundColor: pedido.pagado ? VERDE : "#BDBDBD" }]}
+                  onPress={onPreparar}
+                  disabled={enOperacion || !pedido.pagado}
+                >
                   <Text style={styles.botonTexto}>Preparar</Text>
                 </TouchableOpacity>
               </>
@@ -170,9 +185,18 @@ export default function TarjetaTicket({
                 <Text style={styles.botonTexto}>Entregado</Text>
               </TouchableOpacity>
             ) : null}
+            {onEliminar ? (
+              <TouchableOpacity style={[styles.boton, { backgroundColor: "#C62828" }]} onPress={async () => {
+                const ok = await confirmar("Eliminar pedido", `¿Eliminar el ticket ${String(pedido.id).slice(0, 10)}? No se puede deshacer.`, { textoConfirmar: "Eliminar" });
+                if (ok) onEliminar(pedido);
+              }} disabled={enOperacion}>
+                <Text style={styles.botonTexto}>Eliminar</Text>
+              </TouchableOpacity>
+            ) : null}
           </View>
         </View>
       ) : null}
+      {dialogos}
     </View>
   );
 }
@@ -188,6 +212,12 @@ const styles = StyleSheet.create({
   compradorCaja: { marginTop: 8, borderTopWidth: 1, borderTopColor: "#EDF1EA", paddingTop: 8 },
   compradorLinea: { fontWeight: "600", color: "#2B2F2B", fontSize: 13 },
   lineaResumen: { color: "#5A6B57", fontSize: 12, marginTop: 2 },
+  chipPago: { alignSelf: "flex-start", borderRadius: 10, paddingHorizontal: 8, paddingVertical: 3, marginTop: 6 },
+  chipPagoSi: { backgroundColor: "#E8F5E9" },
+  chipPagoNo: { backgroundColor: "#FFF3E0" },
+  chipPagoTexto: { fontSize: 11, fontWeight: "700" },
+  chipPagoTextoSi: { color: "#2E7D32" },
+  chipPagoTextoNo: { color: "#B26500" },
   totalTicket: { fontWeight: "700", color: VERDE, marginTop: 4 },
   verDetalle: { color: "#2E7D32", fontSize: 12, fontWeight: "700", marginTop: 4 },
   botonDetalle: { paddingVertical: 4, paddingHorizontal: 8, borderRadius: 8, borderWidth: 1, borderColor: "#2E7D32" },

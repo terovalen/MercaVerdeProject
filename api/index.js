@@ -135,6 +135,26 @@ app.get("/api/inventario", autenticar, permitir("vendedor", "administrador"), as
   const snap = await db.collection("Productos").get();
   res.json(snap.docs.map(d => ({ id: d.id, ...vistaInventario(d.data()) })));
 });
+app.get("/api/usuarios", autenticar, permitir("administrador"), async (_req, res) => {
+  const snap = await db.collection("usuarios").get();
+  res.json(snap.docs.map(d => ({ id: d.id, ...d.data() })));
+});
+app.patch("/api/usuarios/:id", autenticar, permitir("administrador"), async (req, res) => {
+  try {
+    const ref = db.collection("usuarios").doc(req.params.id);
+    const snap = await ref.get();
+    if (!snap.exists) return res.status(404).json({ error: "Usuario no encontrado." });
+    const datos = {};
+    if (req.body.rol !== undefined) {
+      const rolesValidos = ["comprador", "vendedor", "administrador", "suspendido"];
+      if (!rolesValidos.includes(req.body.rol)) return res.status(400).json({ error: "Rol inválido." });
+      datos.rol = req.body.rol;
+    }
+    if (req.body.nombre !== undefined) datos.nombre = String(req.body.nombre).trim();
+    await ref.update({ ...datos, actualizadoEn: FieldValue.serverTimestamp() });
+    res.json({ ok: true, mensaje: "Usuario actualizado." });
+  } catch (e) { error(res, e); }
+});
 app.post("/api/pedidos", autenticar, permitir("comprador"), async (req, res) => {
   try {
     const { id, items } = req.body;
@@ -157,10 +177,10 @@ app.post("/api/pedidos", autenticar, permitir("comprador"), async (req, res) => 
         total += precio * item.cantidad;
         normalizedItems.push({ productoId: item.productoId, nombre: p.nombre || p.Nombre || "Producto", precio, cantidad: item.cantidad, unidad: p.unidad || p.Unidad || "unidad" });
       }
-      tx.set(pedidoRef, { usuarioId: req.identidad.uid, generoComprador: perfil.data()?.genero || "prefiero_no_decirlo", items: normalizedItems, total, estado: "recibido", creadoEn: FieldValue.serverTimestamp() });
-      return { total, items: normalizedItems };
+      tx.set(pedidoRef, { usuarioId: req.identidad.uid, generoComprador: perfil.data()?.genero || "prefiero_no_decirlo", items: normalizedItems, total, estado: "pendiente", pagado: false, creadoEn: FieldValue.serverTimestamp() });
+      return { total, items: normalizedItems, pagado: false };
     });
-    res.status(201).json({ id: pedidoRef.id, ...result, estado: "recibido" });
+    res.status(201).json({ id: pedidoRef.id, ...result, estado: "pendiente", pagado: false });
   } catch (e) { error(res, e); }
 });
 app.get("/api/pedidos", autenticar, async (req, res) => {
@@ -168,7 +188,21 @@ app.get("/api/pedidos", autenticar, async (req, res) => {
   const esComprador = ["comprador", "cliente"].includes(req.perfil.rol);
   if (!esComprador && !["vendedor", "administrador"].includes(req.perfil.rol)) return res.status(403).json({ error: "No tienes permisos para consultar pedidos." });
   const snap = esComprador ? await ref.where("usuarioId", "==", req.identidad.uid).get() : await ref.get();
-  res.json(snap.docs.map(d => ({ id: d.id, ...documentoPlano(d) })));
+  let pedidos = snap.docs.map(d => ({ id: d.id, ...documentoPlano(d) }));
+  // Los vendedores/admin no ven pedidos eliminados; los compradores sí (para ver el aviso).
+  if (!esComprador) pedidos = pedidos.filter(p => !p.eliminado);
+  res.json(pedidos);
+});
+app.get("/api/pedidos/:id", autenticar, async (req, res) => {
+  try {
+    const snap = await db.collection("pedidos").doc(req.params.id).get();
+    if (!snap.exists) return res.status(404).json({ error: "Pedido no encontrado." });
+    const pedido = { id: snap.id, ...documentoPlano(snap) };
+    const esComprador = ["comprador", "cliente"].includes(req.perfil.rol);
+    if (esComprador && pedido.usuarioId !== req.identidad.uid) return res.status(404).json({ error: "Pedido no encontrado." });
+    if (!esComprador && !["vendedor", "administrador"].includes(req.perfil.rol)) return res.status(403).json({ error: "No tienes permisos para consultar este pedido." });
+    res.json(pedido);
+  } catch (e) { error(res, e); }
 });
 app.patch("/api/pedidos/:id/cancelar", autenticar, permitir("comprador"), async (req, res) => {
   try {
@@ -176,14 +210,26 @@ app.patch("/api/pedidos/:id/cancelar", autenticar, permitir("comprador"), async 
     await db.runTransaction(async tx => {
       const snap = await tx.get(ref);
       if (!snap.exists || snap.data().usuarioId !== req.identidad.uid) throw new Error("Pedido no encontrado.");
-      if (snap.data().estado !== "recibido") throw new Error("Solo se puede cancelar antes de que el vendedor empiece a separar el pedido.");
+      if (snap.data().estado !== "pendiente") throw new Error("Solo se puede cancelar antes de que el vendedor lo acepte.");
       tx.update(ref, { estado: "cancelado", actualizadoEn: FieldValue.serverTimestamp() });
     });
     res.json({ ok: true });
   } catch (e) { error(res, e); }
 });
+app.patch("/api/pedidos/:id/pagar", autenticar, permitir("comprador"), async (req, res) => {
+  try {
+    const ref = db.collection("pedidos").doc(req.params.id);
+    const snap = await ref.get();
+    if (!snap.exists) return res.status(404).json({ error: "Pedido no encontrado." });
+    const snapData = snap.data();
+    if (snapData.usuarioId !== req.identidad.uid) return res.status(404).json({ error: "Pedido no encontrado." });
+    if (snapData.pagado) throw new Error("El pedido ya fue pagado.");
+    await ref.update({ pagado: true, actualizadoEn: FieldValue.serverTimestamp() });
+    res.json({ ok: true, mensaje: "Pedido pagado." });
+  } catch (e) { error(res, e); }
+});
 app.patch("/api/pedidos/:id", autenticar, permitir("vendedor", "administrador"), async (req, res) => {
-  const allowed = ["en_preparacion", "listo", "entregado"];
+  const allowed = ["pendiente", "en_preparacion", "listo", "entregado"];
   if (!allowed.includes(req.body.estado)) return res.status(400).json({ error: "Estado no permitido." });
   try {
     const ref = db.collection("pedidos").doc(req.params.id);
@@ -191,10 +237,16 @@ app.patch("/api/pedidos/:id", autenticar, permitir("vendedor", "administrador"),
       const snap = await tx.get(ref);
       if (!snap.exists) throw new Error("Pedido no encontrado.");
       const pedido = snap.data();
-      const transiciones = { recibido: ["en_preparacion"], en_preparacion: ["listo"], listo: ["entregado"] };
+      const transiciones = {
+        pendiente: ["en_preparacion", "listo"],
+        en_preparacion: ["listo"],
+        listo: ["entregado"],
+        "cambio_pendiente": ["pendiente"],
+      };
       if (!transiciones[pedido.estado]?.includes(req.body.estado)) throw new Error("El pedido no puede avanzar a ese estado.");
       if (req.body.estado === "en_preparacion") {
         if (pedido.estado === "cambio_pendiente") throw new Error("Espera la respuesta del comprador antes de preparar.");
+        if (!pedido.pagado) throw new Error("El pedido debe estar pagado antes de preparar.");
         const stocks = [];
         const cantidades = (pedido.items || []).reduce((map, item) => { map.set(item.productoId, (map.get(item.productoId) || 0) + Number(item.cantidad)); return map; }, new Map());
         for (const [productoId, cantidad] of cantidades) {
@@ -219,7 +271,7 @@ app.patch("/api/pedidos/:id/propuesta", autenticar, permitir("vendedor", "admini
     const ref = db.collection("pedidos").doc(req.params.id);
     await db.runTransaction(async tx => {
       const pedido = await tx.get(ref);
-      if (!pedido.exists || pedido.data().estado !== "recibido") throw new Error("Solo se pueden proponer cambios antes de separar el pedido.");
+      if (!pedido.exists || !["pendiente"].includes(pedido.data().estado)) throw new Error("Solo se pueden proponer cambios antes de separar el pedido.");
       tx.update(ref, { estado: "cambio_pendiente", itemsPropuestos, motivoCambio: motivo || "Ajuste por disponibilidad", actualizadoEn: FieldValue.serverTimestamp() });
     }); res.json({ ok: true });
   }
@@ -248,9 +300,23 @@ app.patch("/api/pedidos/:id/respuesta-cambio", autenticar, permitir("comprador")
           total += precio * Number(item.cantidad);
           itemsCanonicos.push({ productoId: item.productoId, nombre: data.nombre || data.Nombre || "Producto", precio, cantidad: Number(item.cantidad), unidad: data.unidad || data.Unidad || "unidad" });
         }
-        tx.update(ref, { items: itemsCanonicos, total, itemsPropuestos: FieldValue.delete(), estado: "recibido", respuestaCambio: "aceptado" });
-      } else tx.update(ref, { itemsPropuestos: FieldValue.delete(), estado: "recibido", respuestaCambio: "rechazado" });
+        tx.update(ref, { items: itemsCanonicos, total, itemsPropuestos: FieldValue.delete(), estado: "pendiente", respuestaCambio: "aceptado" });
+      } else tx.update(ref, { itemsPropuestos: FieldValue.delete(), estado: "pendiente", respuestaCambio: "rechazado" });
     }); res.json({ ok: true });
+  } catch (e) { error(res, e); }
+});
+app.delete("/api/pedidos/:id", autenticar, permitir("vendedor", "administrador"), async (req, res) => {
+  try {
+    const ref = db.collection("pedidos").doc(req.params.id);
+    const snap = await ref.get();
+    if (!snap.exists) return res.status(404).json({ error: "Pedido no encontrado." });
+    await ref.update({
+      eliminado: true,
+      eliminadoEn: FieldValue.serverTimestamp(),
+      estado: "eliminado",
+      eliminadoPor: req.perfil.rol,
+    });
+    res.json({ ok: true, mensaje: "Pedido eliminado para todos los usuarios." });
   } catch (e) { error(res, e); }
 });
 /** Crea un producto. El ID lo asigna Firestore; nadie escribe IDs a mano. */

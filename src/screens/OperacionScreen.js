@@ -76,10 +76,11 @@ function FilaInventario({ producto, enOperacion, onPaso, onGuardarCantidad, onEd
 }
 
 /**
- * Panel operativo de vendedor y dashboard del administrador, dividido en
- * secciones (elegidas desde el menú lateral): Inventario, Tickets de pedidos
- * y Analítica (solo administrador). Todo se refresca solo cada pocos
- * segundos: los cambios de pedidos y stock aparecen sin recargar nada.
+ * Panel del vendedor y dashboard del administrador.
+ * Las secciones se eligen desde el menú lateral: Inventario, Tickets de
+ * pedidos y Analítica (esta última solo para el administrador).
+ * Se refresca solo cada pocos segundos, para que los cambios de pedidos
+ * y de stock aparezcan sin recargar.
  */
 export default function OperacionScreen({ route }) {
   const { usuario } = useAuth();
@@ -180,12 +181,18 @@ export default function OperacionScreen({ route }) {
     );
   }
 
+  /** Elimina un pedido (solo vendedor/administrador). */
+  async function eliminarPedido(pedido) {
+    ejecutar(
+      () => apiRequest(`/api/pedidos/${encodeURIComponent(pedido.id)}`, { method: "DELETE" }),
+      "Pedido eliminado."
+    );
+  }
+
   /**
-   * Sustitución sin IDs:
-   * 1. se elige el ítem a reemplazar (automático si hay uno agotado;
-   *    también se puede tocar "Reemplazar" sobre una línea),
-   * 2. se busca el sustituto en el selector y se toca,
-   * 3. se confirma y la API procesa la propuesta.
+   * Sustitución sin IDs: se toca "Reemplazar" en la línea del producto
+   * (o sale solo si hay uno agotado), se busca el sustituto por nombre
+   * y se confirma antes de mandarle la propuesta al comprador.
    */
   function abrirPropuesta(pedido, item = null) {
     if (pedido.estado === ESTADOS_PEDIDO.CAMBIO_PENDIENTE) {
@@ -290,7 +297,7 @@ export default function OperacionScreen({ route }) {
   const seccionAnalitica = <View>
     {analitica ? <GraficosHighcharts pedidosPorEstado={analitica.pedidosPorEstado} productosPopulares={analitica.productosPopulares} camposFormulario={analitica.camposFormulario} /> : null}
     <Text style={{ marginTop: 16, fontWeight: "700", fontSize: 18 }}>Pedidos por estado</Text>
-    {["recibido", "cambio_pendiente", "en_preparacion", "listo", "entregado", "cancelado"].map(e => <Text key={e} style={{ padding: 8, backgroundColor: "white", marginTop: 4 }}>{e.replaceAll("_", " ")}: {pedidos.filter(p => p.estado === e).length}</Text>)}
+    {["pendiente", "en_preparacion", "listo", "entregado", "cancelado"].map(e => <Text key={e} style={{ padding: 8, backgroundColor: "white", marginTop: 4 }}>{e.replaceAll("_", " ")}: {pedidos.filter(p => p.estado === e).length}</Text>)}
     <Text style={{ marginTop: 16, fontWeight: "700", fontSize: 18 }}>Pedidos por género registrado</Text>
     {resumenGenero.map(r => <Text key={r.genero} style={{ padding: 8, backgroundColor: "white", marginTop: 4 }}>{r.genero}: {r.total}</Text>)}
     <Text style={{ marginTop: 16, fontWeight: "700", fontSize: 18 }}>10 productos más comprados por género</Text>
@@ -323,6 +330,7 @@ export default function OperacionScreen({ route }) {
           onListo={() => cambiarEstado(item, "listo")}
           onEntregado={() => cambiarEstado(item, "entregado")}
           onProponer={(itemObjetivo) => abrirPropuesta(item, itemObjetivo)}
+          onEliminar={() => eliminarPedido(item)}
         />
       )}
     />

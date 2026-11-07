@@ -1,6 +1,6 @@
 /**
  * Pastilla de estado reutilizable.
- * Pedidos y alertas de stock comparten la misma forma visual.
+ * Los pedidos y los productos usan la misma forma visual.
  */
 import React from "react";
 import { Text, View } from "react-native";

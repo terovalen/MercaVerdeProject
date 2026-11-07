@@ -8,11 +8,13 @@ import Etiqueta from "./Etiqueta";
 import { mensajeNoCancelable, metaEstado, puedeCancelar } from "../domain/estadosPedido";
 import { formatearFecha, formatearPrecio } from "../utils/formato";
 
-export default function TarjetaPedido({ pedido, onCancelar, onReintentar }) {
+export default function TarjetaPedido({ pedido, onCancelar, onReintentar, onPagar }) {
   const estado = metaEstado(pedido.estado);
   const cancelable = puedeCancelar(pedido.estado);
   const pendiente = pedido.syncEstado === "pendiente";
   const conError = pedido.syncEstado === "error";
+  const pagado = pedido.pagado === true;
+  const puedePagar = !pagado && !pedido.eliminado && pedido.estado === "pendiente";
 
   return (
     <View style={styles.tarjeta}>
@@ -36,6 +38,20 @@ export default function TarjetaPedido({ pedido, onCancelar, onReintentar }) {
       ))}
 
       <Text style={styles.total}>{formatearPrecio(pedido.total)}</Text>
+
+      {/* Cajita de pago dentro de la tarjeta del pedido */}
+      {!pedido.eliminado ? (
+        <View style={[styles.pagoCaja, pagado ? styles.pagoCajaPagado : styles.pagoCajaPendiente]}>
+          <Text style={[styles.pagoTexto, pagado ? styles.pagoTextoPagado : styles.pagoTextoPendiente]}>
+            {pagado ? "Pedido pagado" : "Pedido pendiente de pago"}
+          </Text>
+          {puedePagar ? (
+            <TouchableOpacity style={styles.botonPagar} onPress={() => onPagar?.(pedido)}>
+              <Text style={styles.botonPagarTexto}>Pagar</Text>
+            </TouchableOpacity>
+          ) : null}
+        </View>
+      ) : null}
 
       {conError && pedido.syncMensaje ? <Text style={styles.error}>{pedido.syncMensaje}</Text> : null}
 
@@ -70,6 +86,28 @@ const styles = StyleSheet.create({
   item: { color: "#4A554A", marginBottom: 2 },
   total: { marginTop: 8, fontWeight: "700", color: "#2E7D32", fontSize: 16 },
   error: { color: "#C62828", marginTop: 6, fontSize: 12 },
+  pagoCaja: {
+    marginTop: 10,
+    borderRadius: 10,
+    padding: 10,
+    borderWidth: 1,
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+  },
+  pagoCajaPagado: { backgroundColor: "#E8F5E9", borderColor: "#C8E6C9" },
+  pagoCajaPendiente: { backgroundColor: "#FFF8E1", borderColor: "#FFE082" },
+  pagoTexto: { fontSize: 13, fontWeight: "700", flex: 1 },
+  pagoTextoPagado: { color: "#2E7D32" },
+  pagoTextoPendiente: { color: "#8D5B00" },
+  botonPagar: {
+    backgroundColor: "#2E7D32",
+    borderRadius: 8,
+    paddingHorizontal: 18,
+    paddingVertical: 8,
+    marginLeft: 10,
+  },
+  botonPagarTexto: { color: "#fff", fontWeight: "700", fontSize: 13 },
   bloqueado: { color: "#7A867A", marginTop: 8, fontSize: 12 },
   boton: {
     marginTop: 10,

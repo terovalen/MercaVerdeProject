@@ -1,5 +1,5 @@
 /**
- * Menú lateral con secciones: comprador (catálogo, mis pedidos, alertas) y
+ * Menú lateral con secciones: comprador (catálogo y mis pedidos) y
  * vendedor/admin (inventario, tickets de pedidos, y analítica del admin).
  * Cada sección navega a Operacion con el parámetro `seccion`.
  */
@@ -10,7 +10,6 @@ export default function MenuPrincipal({
   rol = "comprador",
   onInicio,
   onPedidos,
-  onAlertas,
   onInventario,
   onTickets,
   onAnalitica,
@@ -48,7 +47,6 @@ export default function MenuPrincipal({
             {rol === "comprador" ? <>
               <Opcion texto="Catálogo" onPress={() => elegir(onInicio)} />
               <Opcion texto="Mis pedidos" onPress={() => elegir(onPedidos)} />
-              <Opcion texto="Alertas de stock" onPress={() => elegir(onAlertas)} />
             </> : <>
               <Opcion texto="Inventario" onPress={() => elegir(onInventario)} />
               <Opcion texto="Tickets de pedidos" onPress={() => elegir(onTickets)} />

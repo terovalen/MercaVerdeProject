@@ -1,13 +1,8 @@
 /**
- * Formulario de creación y edición de productos (vendedor/administrador).
- * Nadie escribe IDs de Firestore: al crear, el servidor asigna el id y la
- * app solo guarda la referencia del producto; al editar, se envía el id
- * internamente. Valida en el celular y muestra tanto los éxitos como los
- * errores (los suyos y los que devuelve la API).
- *
- * La imagen funciona igual que la de los productos ya cargados: es una URL
- * externa que se pega por texto y se guarda en el campo imagenUrl. La app
- * la muestra con <Image>; no depende de Storage ni del plan del proyecto.
+ * Formulario para crear y editar productos.
+ * Al crear, el id lo pone el servidor; al editar, el id viaja por dentro.
+ * La imagen es una URL pegada a mano, como la de los productos que ya
+ * estaban cargados, así que no dependemos de Storage.
  */
 import React, { useEffect, useState } from "react";
 import {

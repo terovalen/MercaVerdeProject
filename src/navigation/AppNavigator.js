@@ -11,6 +11,7 @@ import { SyncProvider } from "../context/SyncContext";
 import IndicadorConexion from "../components/IndicadorConexion";
 import AvisoSinConexion from "../components/AvisoSinConexion";
 import MenuPrincipal from "../components/MenuPrincipal";
+import MenuAdministrador from "../components/MenuAdministrador";
 
 import LoginScreen from "../screens/LoginScreen";
 import RegistroScreen from "../screens/RegistroScreen";
@@ -18,8 +19,14 @@ import CatalogoScreen from "../screens/CatalogoScreen";
 import DetalleProductoScreen from "../screens/DetalleProductoScreen";
 import CarritoScreen from "../screens/CarritoScreen";
 import MisPedidosScreen from "../screens/MisPedidosScreen";
-import AlertasStockScreen from "../screens/AlertasStockScreen";
+import PagoScreen from "../screens/PagoScreen";
 import OperacionScreen from "../screens/OperacionScreen";
+import AdminDashboardScreen from "../screens/admin/AdminDashboardScreen";
+import AdminUsuariosScreen from "../screens/admin/AdminUsuariosScreen";
+import AdminSoporteScreen from "../screens/admin/AdminSoporteScreen";
+import AdminProductosScreen from "../screens/admin/AdminProductosScreen";
+import AdminReportesScreen from "../screens/admin/AdminReportesScreen";
+import AdminConfiguracionScreen from "../screens/admin/AdminConfiguracionScreen";
 
 const Stack = createNativeStackNavigator();
 const navegacionRef = createNavigationContainerRef();
@@ -42,7 +49,17 @@ function PilaAutenticacion() {
 function PilaPrincipal({ rol }) {
   return (
     <Stack.Navigator screenOptions={opcionesVerdes}>
-      {rol !== "comprador" ? (
+      {rol === "administrador" ? (
+        <>
+          <Stack.Screen name="AdminDashboard" component={AdminDashboardScreen} options={{ title: "Dashboard" }} />
+          <Stack.Screen name="AdminUsuarios" component={AdminUsuariosScreen} options={{ title: "Gestión de usuarios" }} />
+          <Stack.Screen name="AdminSoporte" component={AdminSoporteScreen} options={{ title: "Centro de soporte" }} />
+          <Stack.Screen name="AdminProductos" component={AdminProductosScreen} options={{ title: "Gestión de productos" }} />
+          <Stack.Screen name="AdminReportes" component={AdminReportesScreen} options={{ title: "Reportes y analíticas" }} />
+          <Stack.Screen name="AdminConfiguracion" component={AdminConfiguracionScreen} options={{ title: "Configuración" }} />
+          <Stack.Screen name="Operacion" component={OperacionScreen} options={{ title: "Inventario y pedidos" }} />
+        </>
+      ) : rol !== "comprador" ? (
         <Stack.Screen name="Operacion" component={OperacionScreen} options={{ title: rol === "administrador" ? "Administración" : "Gestión de mercado" }} />
       ) : <>
       <Stack.Screen name="Catalogo" component={CatalogoScreen} options={{ headerShown: false }} />
@@ -58,9 +75,9 @@ function PilaPrincipal({ rol }) {
         options={{ title: "Mis pedidos" }}
       />
       <Stack.Screen
-        name="AlertasStock"
-        component={AlertasStockScreen}
-        options={{ title: "Alertas de stock" }}
+        name="PagoScreen"
+        component={PagoScreen}
+        options={{ title: "Pagar pedido" }}
       />
       </>}
     </Stack.Navigator>
@@ -89,16 +106,33 @@ function ZonaAutenticada({ usuario }) {
           <View style={{ flex: 1 }}>
             <IndicadorConexion />
           </View>
-          <MenuPrincipal
-            rol={usuario.rol || "comprador"}
-            onInicio={() => (usuario.rol === "comprador" ? irA("Catalogo") : irA("Operacion", { seccion: "inventario" }))}
-            onPedidos={() => (usuario.rol === "comprador" ? irA("MisPedidos") : irA("Operacion", { seccion: "tickets" }))}
-            onAlertas={() => (usuario.rol === "comprador" ? irA("AlertasStock") : irA("Operacion", { seccion: "analitica" }))}
-            onInventario={() => irA("Operacion", { seccion: "inventario" })}
-            onTickets={() => irA("Operacion", { seccion: "tickets" })}
-            onAnalitica={() => irA("Operacion", { seccion: "analitica" })}
-            onSalir={salir}
-          />
+          {usuario.rol === "administrador" ? (
+            <MenuAdministrador
+              onSalir={salir}
+              onNavegar={(seccion) => {
+                const mapaSecciones = {
+                  dashboard: "AdminDashboard",
+                  usuarios: "AdminUsuarios",
+                  monitoreo: "AdminMonitoreo",
+                  soporte: "AdminSoporte",
+                  productos: "AdminProductos",
+                  reportes: "AdminReportes",
+                  configuracion: "AdminConfiguracion",
+                };
+                irA(mapaSecciones[seccion] || "AdminDashboard");
+              }}
+            />
+          ) : (
+            <MenuPrincipal
+              rol={usuario.rol || "comprador"}
+              onInicio={() => (usuario.rol === "comprador" ? irA("Catalogo") : irA("Operacion", { seccion: "inventario" }))}
+              onPedidos={() => (usuario.rol === "comprador" ? irA("MisPedidos") : irA("Operacion", { seccion: "tickets" }))}
+              onInventario={() => irA("Operacion", { seccion: "inventario" })}
+              onTickets={() => irA("Operacion", { seccion: "tickets" })}
+              onAnalitica={() => irA("Operacion", { seccion: "analitica" })}
+              onSalir={salir}
+            />
+          )}
         </View>
         <AvisoSinConexion />
         <CartProvider usuarioId={usuario.uid}>
