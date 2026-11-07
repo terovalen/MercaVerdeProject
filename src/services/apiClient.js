@@ -7,17 +7,22 @@ import { auth } from "./firebaseConfig";
  * La API vive en esa misma PC en el puerto 3001.
  *
  * Orden de decisión:
- * 1. En web: usar el hostname del navegador.
+ * 1. En web: si hay una EXPO_PUBLIC_API_URL de producción (https), esa manda.
+ *    Si no, el hostname del navegador (la PC que corre Metro).
  * 2. En móvil nativo: intentar leer expo-constants (Constants.expoConfig.hostUri).
- * 3. EXPO_PUBLIC_API_URL del .env.
- * 4. localhost (simulador o respaldo).
+ * 3. localhost (simulador o respaldo).
  */
 const PUERTO_API = process.env.EXPO_PUBLIC_API_PORT || "3001";
 
 function resolverBaseUrl() {
-  // 1. Web (navegador): el navegador recibió la app de la PC que corre Metro,
-  //    la misma que corre la API. Usamos el hostname del navegador.
+  // 1. Web (navegador). En desarrollo la app llega de Metro en la PC y la API
+  //    vive en esa misma PC. En producción (despliegue) la dirección de la
+  //    API viene en EXPO_PUBLIC_API_URL, que se fija en Vercel antes de compilar.
   if (typeof window !== "undefined" && window.location?.hostname) {
+    const enLaNube = process.env.EXPO_PUBLIC_API_URL;
+    if (enLaNube && enLaNube.startsWith("https://")) {
+      return enLaNube.replace(/\/+$/, "");
+    }
     const h = window.location.hostname;
     if (h && h !== "localhost" && h !== "127.0.0.1") {
       return `http://${h}:${PUERTO_API}`;
@@ -41,12 +46,7 @@ function resolverBaseUrl() {
     // expo-constants no disponible en este entorno
   }
 
-  // 3. EXPO_PUBLIC_API_URL del .env
-  if (process.env.EXPO_PUBLIC_API_URL) {
-    return process.env.EXPO_PUBLIC_API_URL;
-  }
-
-  // 4. localhost (respaldo)
+  // 3. localhost (respaldo)
   return `http://localhost:${PUERTO_API}`;
 }
 

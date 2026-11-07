@@ -1,11 +1,18 @@
 import "dotenv/config";
 import express from "express";
-import { applicationDefault, initializeApp } from "firebase-admin/app";
+import { applicationDefault, cert, initializeApp } from "firebase-admin/app";
 import { getAuth } from "firebase-admin/auth";
 import { getFirestore, FieldValue } from "firebase-admin/firestore";
 import { getStorage } from "firebase-admin/storage";
 
-initializeApp({ credential: applicationDefault(), projectId: process.env.FIREBASE_PROJECT_ID || "mercaverde-2a8ad" });
+// En la PC la clave de servicio es el archivo service.account.json (se busca
+// solo). En Vercel no hay archivos de credenciales: viaja completa en la
+// variable de entorno FIREBASE_SERVICE_ACCOUNT.
+const credencial = process.env.FIREBASE_SERVICE_ACCOUNT
+  ? cert(JSON.parse(process.env.FIREBASE_SERVICE_ACCOUNT))
+  : applicationDefault();
+
+initializeApp({ credential: credencial, projectId: process.env.FIREBASE_PROJECT_ID || "mercaverde-2a8ad" });
 const db = getFirestore();
 const app = express();
 // 5mb: las imágenes llegan como base64 (un ~37% más grandes que el original).
@@ -420,4 +427,8 @@ app.get("/api/analitica", autenticar, permitir("administrador"), async (_req, re
 });
 
 const port = Number(process.env.PORT || 3001);
-app.listen(port, () => console.log(`MercaVerde API escuchando en ${port}`));
+// En Vercel la API corre como función serverless: el runtime maneja las
+// peticiones y no le toca a la app quedarse escuchando en un puerto.
+if (process.env.VERCEL !== "1") {
+  app.listen(port, () => console.log(`MercaVerde API escuchando en ${port}`));
+}

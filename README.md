@@ -101,7 +101,7 @@ api/
   .env / .env.example         # variables de entorno del backend
   service.account.json        # clave de servicio de Firebase (no compartir ni subir a Git)
 firestore.rules               # reglas de seguridad de Firestore
-docs/                         # matriz de pruebas, guía de ejecución, registro de errores
+docs/                         # matriz de pruebas, guía de ejecución, registro de errores, guía de despliegue
 ```
 
 ## Endpoints de la API
@@ -209,6 +209,10 @@ La IP de la API se deduce del navegador (`src/services/apiClient.js`), así que 
 ```powershell
 taskkill /F /IM node.exe
 ```
+
+### En Vercel (opcional)
+
+La API y la versión web se pueden desplegar en Vercel para que el enlace de la web funcione sin PC encendida. La app de los celulares sigue en Expo Go contra la PC, como siempre. El paso a paso completo está en `docs/DESPLEGUE_VERCEL.md`.
 
 ### Firewall de Windows (solo la primera vez en cada PC)
 
