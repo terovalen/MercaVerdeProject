@@ -46,9 +46,10 @@ export default function AdminSoporteScreen() {
     cargar();
   }, [cargar]));
 
-  // Refresco automático cada 7 segundos para ver cambios de estado
+  // Refresco automático cada minuto (más seguido vacía la cuota gratis de
+  // Firestore); el dato al instante está con el refresco a mano.
   useEffect(() => {
-    const t = setInterval(cargar, 7000);
+    const t = setInterval(cargar, 60000);
     return () => clearInterval(t);
   }, [cargar]);
 

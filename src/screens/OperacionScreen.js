@@ -15,8 +15,10 @@ import { ESTADOS_PEDIDO } from "../domain/estadosPedido";
 
 const verde = "#2E7D32";
 
-/** Intervalo del refresco automático: pedidos y stock aparecen sin recargar. */
-const MS_REFRESCO = 7000;
+/** Intervalo del refresco automático (cada minuto). El dato al instante está
+ * con el refresco a mano: cada 7 segundos vaciaba la cuota gratis de
+ * Firestore y dejaba la API sin poder leer por el resto del día. */
+const MS_REFRESCO = 60000;
 
 const TITULOS_SECCION = {
   inventario: "Inventario",

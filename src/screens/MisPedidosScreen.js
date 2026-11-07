@@ -123,14 +123,16 @@ export default function MisPedidosScreen({ navigation }) {
     }
   }
 
-  // Refresco automático: pedidos nuevos, cambios de estado del vendedor
-  // o respuestas a propuestas aparecen solos sin volver a entrar a la pantalla.
+  // Refresco automático cada minuto: pedidos nuevos, cambios de estado del
+  // vendedor o respuestas a propuestas aparecen al rato sin volver a entrar
+  // a la pantalla. Más seguido de esto vacía la cuota gratis de Firestore.
+  // Para el dato ya está el refresco a mano (bajar la lista).
   useEffect(() => {
     if (enLinea !== true) return;
     const id = setInterval(async () => {
       await sincronizar();
       await cargar();
-    }, 7000);
+    }, 60000);
     return () => clearInterval(id);
   }, [sincronizar, cargar, enLinea]);
 
