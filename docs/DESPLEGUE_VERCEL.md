@@ -53,12 +53,12 @@ Con el commit y el push queda.
 
    | Campo | Valor |
    |---|---|
-   | Framework Preset | Expo |
-   | Build Command | `npx expo export --platform web` (lo llena el preset) |
-   | Output Directory | `dist` |
+   | Framework Preset | **Other** (importante: no Node.js, porque busca un servidor y el fallo fue justo ese) |
+   | Build Command | **déjalo vacío** (lo manda el `vercel.json` con el script `build` del package.json) |
+   | Output Directory | **déjalo vacío** (igual, lo dice el `vercel.json`) |
    | Install Command | `npm install` (el que sugiera) |
 
-   Ponle otro nombre al proyecto para que no choque con el de la API, por ejemplo `merca-verde`.
+   El `vercel.json` de la raíz hace dos cosas: arma la web con `npm run build` (que corre `expo export --platform web` y deja todo en `dist/`) y sirve esa carpeta como página estática. Si los campos de Build quedaron llenos de la pantalla de creación, bórralos para que mande el `vercel.json`.
 3. En **Environment Variables** agrega:
 
    | Nombre | Valor |
